@@ -41,12 +41,12 @@ flake_file="./flake.nix"
 sed -i "s/version = \".*\"/version = \"$upstream\"/" "$flake_file"
 
 # Update specific.sha256
-specific=$(nix-prefetch-url --type sha256 --unpack "$base_url/zen.linux-specific.tar.bz2")
-if [ $? -ne 0 ]; then
-    echo "Error: Failed to fetch SHA256 for linux-specific"
-    exit 1
-fi
-sed -i "s/specific.sha256 = \".*\"/specific.sha256 = \"$specific\"/" "$flake_file"
+#specific=$(nix-prefetch-url --type sha256 --unpack "$base_url/zen.linux-specific.tar.bz2")
+#if [ $? -ne 0 ]; then
+#    echo "Error: Failed to fetch SHA256 for linux-specific"
+#    exit 1
+#fi
+#sed -i "s/specific.sha256 = \".*\"/specific.sha256 = \"$specific\"/" "$flake_file"
 
 # Update generic.sha256
 generic=$(nix-prefetch-url --type sha256 --unpack "$base_url/zen.linux-generic.tar.bz2")
