@@ -4,7 +4,7 @@ This is a nix flake for the Zen browser.
 
 ## Features
 
-- Linux and MacOS support
+- Linux and macOS support
 - Available for _x86_64_ and _aarch64_
 - Support for _twilight_ and _beta_
 - [Policies can be modified via Home Manager and unwrapped package override](#policies)
@@ -12,6 +12,8 @@ This is a nix flake for the Zen browser.
 - Browser update checks are disabled by default
 - The default twilight version is reliable and reproducible
 - [Declarative \[Work\]Spaces (including themes, icons, containers)](#spaces)
+- [Declarative keyboard shortcuts with version protection](#keyboard-shortcuts)
+- [Declarative mods installation from Zen theme store](#mods)
 
 ## Installation
 
@@ -22,8 +24,7 @@ inputs = {
   zen-browser = {
     url = "github:0xc000022070/zen-browser-flake";
     inputs = {
-      # IMPORTANT: we're using "libgbm" and is only available in unstable so ensure
-      # to have it up-to-date or simply don't specify the nixpkgs input
+      # IMPORTANT: To ensure compatibility with the latest Firefox version, use nixpkgs-unstable.
       nixpkgs.follows = "nixpkgs";
       home-manager.follows = "home-manager";
     };
@@ -74,7 +75,7 @@ Check the [Home Manager Reference](#home-manager-reference) and my rice
 <details>
 <summary><h4>With environment.systemPackages or home.packages</h4></summary>
 
-To integrate `Zen Browser` to your NixOS/Home Manager configuration, add the
+To integrate `Zen Browser` into your NixOS/Home Manager configuration, add the
 following to your `environment.systemPackages` or `home.packages`:
 
 ```nix
@@ -121,7 +122,7 @@ further documentation.
 
 `programs.zen-browser.*`
 
-- `enable` (_boolean_): Enable the home manager config.
+- `enable` (_boolean_): Enable the Home Manager config.
 
 - `nativeMessagingHosts` (listOf package): To
   [enable communication between the browser and native applications](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/Native_messaging).
@@ -176,11 +177,13 @@ Check
 
 - profiles:
   - [extensions](#extensions)
+  - [mods](#mods)
   - [search](#search)
   - [preferences](#preferences)
   - [bookmarks](#bookmarks)
   - [spaces](#spaces)
   - [pinned tabs](#pinned-tabs-pins)
+  - [keyboard shortcuts](#keyboard-shortcuts)
   - [userChrome](#userchromecss)
 
 ### Extensions
@@ -216,15 +219,34 @@ You can search for package names by going to
 > [!IMPORTANT]
 > Depending on how your flake is configured, you might not be able to install
 > extensions marked "unfree" like [improved-tube](https://improvedtube.com/).
-> For those extensions, the only way to install them is through the firefox
+> For those extensions, the only way to install them is through the Firefox
 > store
 >
 > If you are not using the
-> [fireox-addons](https://nur.nix-community.org/repos/rycee/) repo, your
-> configuration will still build with the configuration, but the extension will
+> [firefox-addons](https://nur.nix-community.org/repos/rycee/) repo, your
+> configuration will still build, but the extension will
 > not install.\
 > Doing so through the repo will throw a build error warning you about the
 > package being unfree
+
+You can also use [this alternative path](https://github.com/0xc000022070/zen-browser-flake/tree/b6b1e625e4aa049b59930611fc20790c0ccbc840?tab=readme-ov-file#extensions). Check [my config](https://github.com/luisnquin/nixos-config/blob/9f641d16c74cf9a90fdf5b654376a1d6c8cc1f86/home/modules/programs/browser/zen/policies-config.nix#L46) too.
+
+### Mods
+
+Mods are themes and extensions available in the [Zen theme store](https://zen-browser.app/mods). You can browse and install them directly in the browser, but to make them declarative, you can list their UUIDs here.
+
+To find the UUID of a mod, visit the mod's page in the Zen theme store and copy the UUID from the URL.
+
+> [!NOTE]
+> You need to restart the browser to see the changes.
+
+```nix
+{
+  programs.zen-browser.profiles.*.mods = [
+    "e122b5d9-d385-4bf8-9971-e137809097d0" # No Top Sites
+  ];
+}
+```
 
 ### Search
 
@@ -236,8 +258,8 @@ You can search for package names by going to
         force = true; # Needed for nix to overwrite search settings on rebuild
         default = "ddg"; # Aliased to duckduckgo, see other aliases in the link above
         engines = {
-            # My nixos Option and package search shortcut
-          mynixos = {
+           # My NixOS Option and package search shortcut
+         mynixos = {
             name = "My NixOS";
             urls = [
               {
@@ -264,7 +286,7 @@ You can search for package names by going to
 
 ```nix
 {
-  programs.zen-browser.profiiles.*.settings = {
+  programs.zen-browser.profiles.*.settings = {
     "browser.tabs.warnOnClose" = false;
     "browser.download.panel.shown" = false;
     # Since this is a json value, it can be nixified and translated by home-manager;
@@ -528,6 +550,71 @@ You are also able to declare your pinned tabs! For more info, see
 }
 ```
 
+### Keyboard Shortcuts
+
+Declarative overrides of Zen Browser's keyboard shortcuts with version protection against breaking changes.
+
+```nix
+{
+  programs.zen-browser.profiles.default = {
+    keyboardShortcuts = [
+      # Change compact mode toggle to Ctrl+Alt+S
+      {
+        id = "zen-compact-mode-toggle";
+        key = "s";
+        modifiers = {
+          control = true;
+          alt = true;
+        };
+      }
+      # Disable the quit shortcut to prevent accidental closes
+      {
+        id = "key_quitApplication";
+        disabled = true;
+      }
+    ];
+    # Fails activation on schema changes to detect potential regressions
+    # Find this in about:config or prefs.js of your profile
+    keyboardShortcutsVersion = 14;
+  };
+}
+```
+
+When you declare a shortcut override:
+
+- Identity fields (`id`, `group`, `action`, `l10nId`, `reserved`, `internal`) are preserved from Zen's defaults
+- Binding fields (`key`, `keycode`, `modifiers`, `disabled`) are completely replaced with your declaration
+
+#### Configuration Options
+
+- `profiles.*.keyboardShortcuts` (list of submodules): Declarative keyboard shortcuts configuration.
+  - `id` (string) **Required.** Unique identifier for the shortcut to modify.
+  - `key` (null or string) Character key (e.g., "a", "1", "+"). Leave null to use default.
+  - `keycode` (null or string) Virtual key code for special keys (e.g., "VK_F1", "VK_DELETE"). Leave null to use default.
+  - `disabled` (null or boolean) Set to true to disable the shortcut. Leave null to use default.
+  - `modifiers` (null or submodule) Modifier keys configuration. Leave null to use defaults.
+    - `control` (null or boolean) Ctrl key modifier.
+    - `alt` (null or boolean) Alt key modifier.
+    - `shift` (null or boolean) Shift key modifier.
+    - `meta` (null or boolean) Meta/Windows/Command key modifier.
+    - `accel` (null or boolean) Accelerator key (Ctrl on Linux/Windows, Cmd on macOS).
+
+- `profiles.*.keyboardShortcutsVersion` (null or integer) Expected version of the keyboard shortcuts schema. If set, activation will fail if the Zen Browser shortcuts version doesn't match, preventing silent breakage after Zen Browser updates. Find the current version in `about:config` as `zen.keyboard.shortcuts.version`.
+
+### Finding Shortcut IDs
+
+Search for shortcut IDs and their actions in `~/.zen/<profile>/zen-keyboard-shortcuts.json`. For example:
+
+```bash
+jq -c '.shortcuts[] | {id, key, keycode, action}' ~/.zen/default/zen-keyboard-shortcuts.json | fzf
+```
+
+Alternatively, you could also go to the keyboard shorcuts page in settings, and then inspect the input field of the shortcut you want to change, in the inspect window look for "key={whatever}", the value of "key" is the id you should put in your configuration
+
+### Notes on activation
+
+Keyboard shortcuts are still managed by Zen and the home manager module only overrides them on activation. That means that Zen needs to be started at least once to create the shortcuts file if it doesn't exist yet. Then, every rebuild of your configuration (`nixos-rebuild switch` or `home-manager switch`) will apply your keybindings. Also note that you can just re-run activation scripts with `systemctl start home-manager-${USER}.service`.
+
 ### userChrome.css
 
 ```nix
@@ -540,7 +627,15 @@ You are also able to declare your pinned tabs! For more info, see
 }
 ```
 
-[Artile on how to costumize userChrome](https://mefmobile.org/how-to-customize-firefoxs-user-interface-with-userchrome-css/)
+[Article on how to customize userChrome](https://mefmobile.org/how-to-customize-firefoxs-user-interface-with-userchrome-css/)
+
+## User Configurations
+
+Here are some user configurations that showcase different setups using this flake:
+
+- [ch1bo](https://github.com/ch1bo/dotfiles/blob/master/home-modules/browser/zen.nix)
+- [luisnquin](https://github.com/luisnquin/nixos-config/blob/main/home/modules/programs/browser/zen/default.nix)
+- [skifli](https://github.com/skifli/nixos/blob/main/users/programs/browser/zen.nix)
 
 ## 1Password
 
